@@ -1,0 +1,132 @@
+---
+title: "ML-lab 1"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+This is an overview of the four labs in Machine Learning:
+
+* **Part 1: Create a clean dataset for building logistic regression models. **We discuss a paper (Predicting College Enrollment from Student Interaction with an Intelligent Tutoring System in Middle School) and the goal is to replicate the experiment in the paper. First, we need to understand the learning context, get the dataset, create a clean dataset for the eperiment, and visualize variables in the dateset to have an overview of it.
+* **Part 2: Develop a baseline model** We discuss the process of building a machine learning workflow.
+* **Part 3: Improve model iterativelly** We discuss the importance of feature engineering and how to communicate findings. We analyze confusion matrix, creatively add new features to iteratively improve model, and report findings.
+* **Part 4: Compare results from different learning algorithms** We change the learning algorithm in the paper to decision trees and compare results.  
+
+## Part 1.1. Understand the learning context
+Read the paper and identify: 
+
+* What kinds of learning activities are available in the ASSISTment system? 
+* What's the research question? 
+* What's the prediction task? 
+* What are the variables used in the prediction task? 
+* How might these variables be informative for the prediction task?
+* What kinds of new knowledge does this study adds to the filed of STEM education?
+
+## Part 1.2. Get the dataset
+After reviewing the paper, we can see that the task is to predict whether a student will enroll in college and the authors used the following variables to predict college enrollment: carelessness, knowledge, correctness, boredom, enagged concentration, confusion, offtask, gaming, and number of first actions. We will use a portion of the ASSISTment data to replicate the experiment in the paper. The data is in fold "ASSISTmentData." There are 11 datasets in the folder. We need to create one dataset from these 11 datasets.
+
+### Load the package for reading csv files
+```{r}
+library(plyr)
+library(readr)
+library(dplyr)
+```
+
+### Import the data
+```{r}
+setwd("~/Downloads")
+mydir = "ASSISTmentData"
+myfiles = list.files(path=mydir, pattern="*.csv", full.names=TRUE)
+myfiles
+dat_csv = ldply(myfiles, read_csv)
+
+```
+
+## Part 1.3. Create a clean dataset
+Look closely at the 11 datasets in the folder, you will find that files starting with "student" do not have prediction lable and one student is in multiple rows in these files. We need to delete duplicate rows in the files starting with "student" and combine it with the file "prediction". For more information about the meaning of columns, please read this file (https://docs.google.com/spreadsheets/d/1QVUStXiRerWbH1X0P11rJ5IsuU2Xutu60D1SjpmTMlk/edit?usp=sharing). 
+
+### Delete duplicate rows
+ITEST_id is a deidentified ID/tag used for identifying an individual student. Thus, we delete duplicate rows based on this column so that we only have one row per student. 
+```{r}
+dat_csv = dat_csv[!duplicated(dat_csv$ITEST_id),]
+```
+
+#### [Your Turn]{style="color: green;"} ⤵ {style="font-style: normal; font-variant-caps: normal; letter-spacing: normal; orphans: auto; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: auto; word-spacing: 0px; -webkit-tap-highlight-color: rgba(26, 26, 26, 0.3); -webkit-text-size-adjust: auto; -webkit-text-stroke-width: 0px; text-decoration: none; caret-color: rgb(0, 0, 0); color: rgb(0, 0, 0);"}
+
+* How many students and variabeles does this dataset have?
+* What are the variables used in the experiment of the paper?
+
+### Combine features for prediction and predicted lable into one dataset
+Now, we have dat_csv, which is the dataset containing students' information. Next, let's load the dataset containing predicted label.
+```{r}
+dat_csv_predict <- read.csv("~/Downloads/ASSISTmentData/Prediction/prediction.csv", header = TRUE)
+dat_csv_predict <- data.frame(dat_csv_predict)
+```
+
+#### [Your Turn]{style="color: green;"} ⤵ {style="font-style: normal; font-variant-caps: normal; letter-spacing: normal; orphans: auto; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: auto; word-spacing: 0px; -webkit-tap-highlight-color: rgba(26, 26, 26, 0.3); -webkit-text-size-adjust: auto; -webkit-text-stroke-width: 0px; text-decoration: none; caret-color: rgb(0, 0, 0); color: rgb(0, 0, 0);"}
+
+* How many students and variabeles does this dataset have?
+* What are the variables used in the experiment of the paper?
+
+Next, let's combine dat_csv and dat_csv_predict. You might have noticed that we will get less than 1000 instances for the experiment, which is a very small dataset. For this lab, we use this small dataset for practice. In your own project, it would be good if you have more than 1000 instances and the more, the better. We will use ITEST_id to combine these two datasets.
+```{r}
+dat_csv_combine <- dat_csv %>% inner_join(dat_csv_predict, by="ITEST_id")
+```
+
+* How many students and variabeles does this combined dataset have?
+* What are the variables used in the experiment of the paper?
+
+Next, let's keep only the variables that we will use for the experiment.
+```{r}
+dat_csv_combine <- dat_csv_combine %>% select("ITEST_id", "AveCarelessness","AveKnow","AveCorrect.x","AveResBored","AveResEngcon","AveResConf","AveResOfftask","AveResGaming","NumActions","isSTEM")
+```
+
+## Part 1.4. Visualize variables in the combined dateset
+Now, we get the dataset for modeling. Before modeling, let's look at the relationship between features for prediction and predicted label one by one and evaluate whether these features would be informative for the prediction. Let's start with the relationship between AveCarelessness and isSTEM.
+
+### Create a visualization with two variables
+load ggplot for data visualization and Hmisc for computing means
+```{r}
+library(ggplot2)
+library(Hmisc) 
+```
+
+Create a bar with mean of AveCarelessness and isSTEM.
+```{r}
+ggplot(dat_csv_combine, aes(x=isSTEM, y=AveCarelessness)) +
+  stat_summary(fun.data=mean_sdl, geom="bar")
+```
+
+#### [Your Turn]{style="color: green;"} ⤵ {style="font-style: normal; font-variant-caps: normal; letter-spacing: normal; orphans: auto; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: auto; word-spacing: 0px; -webkit-tap-highlight-color: rgba(26, 26, 26, 0.3); -webkit-text-size-adjust: auto; -webkit-text-stroke-width: 0px; text-decoration: none; caret-color: rgb(0, 0, 0); color: rgb(0, 0, 0);"}
+
+* What do you see in this bar chart?
+
+Now create more bars to explore the relationship between features for prediction and predicted lable.
+
+#### [Your Turn]{style="color: green;"} ⤵ {style="font-style: normal; font-variant-caps: normal; letter-spacing: normal; orphans: auto; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: auto; word-spacing: 0px; -webkit-tap-highlight-color: rgba(26, 26, 26, 0.3); -webkit-text-size-adjust: auto; -webkit-text-stroke-width: 0px; text-decoration: none; caret-color: rgb(0, 0, 0); color: rgb(0, 0, 0);"}
+```{r}
+#write your code here
+```
+
+* What do you see in the bar charts?
+
+### Create a visualization with three variables
+Now create a scatter plot with two variables from the features for prediction and the predicted label. In the scatter plot, the two variabales will be x or y axis and the predicted label will be the color of dots. 
+```{r}
+#write your code here
+```
+
+* What do you see in the scatter plots?
+
+## Part 1.5. Communicate your insights
+
+* How might the selected features be informative for the prediction task?
+
+
+
+
