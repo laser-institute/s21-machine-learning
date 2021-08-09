@@ -1,0 +1,157 @@
+---
+title: "Machine Learning - Learning Lab 4"
+author: ""
+output:
+  html_notebook: default
+  html_document:
+    df_print: paged
+  pdf_document: default
+name: ''
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+Feature engineering is the process of using domain knowledge to create informative features that would potentially improve the model. In this part, we will add a feature and evaluate whether the feature is informative.
+
+Before that, let's repeat the steps of building a baseline model in ML lab 2. Note, `dat_csv_combine_final_full.csv` includes a full list of features. You can read the description of the features [here](https://docs.google.com/spreadsheets/d/1QVUStXiRerWbH1X0P11rJ5IsuU2Xutu60D1SjpmTMlk/edit#gid=0). We will use this data set for feature engineering.
+
+### Load the packages
+
+```{r}
+library(tidymodels)
+library(glmnet)
+library(here)
+library(fastDummies)
+library(kknn)
+```
+
+### Load the data set
+
+```{r}
+dat_csv_combine <- read_csv(here("data", "dat_csv_combine_final_full.csv"))
+
+dat_csv_combine <- dat_csv_combine %>% 
+  mutate(isSTEM = as.character(isSTEM))
+```
+
+### Start with good features
+
+From ML lab 2, we know that `AveCarelessness` and `AveResFrust` are two good features for predicting whether students would choose STEM career or not. Let's use these two features to build the baseline model.
+
+```{r}
+dat_csv_combine <- dat_csv_combine %>% 
+  select(AveCarelessness, AveResFrust, problemType, isSTEM)
+
+dat_csv_combine <- dat_csv_combine %>% 
+  mutate(problemType = as.factor(problemType)) %>% 
+  mutate(isSTEM = as.character(isSTEM))
+```
+
+### Data splitting & resampling
+
+```{r}
+set.seed(123)
+
+splits <- initial_split(dat_csv_combine, strata = isSTEM)
+
+data_other <- training(splits)
+
+data_test  <- testing(splits)
+```
+
+## Single resample
+
+```{r}
+set.seed(234)
+data_other_split <- initial_split(data_other,
+                                prop = 0.8,
+                                strata = isSTEM)
+
+data_other_train <- data_other_split %>%
+                    training()
+
+data_other_validation <- data_other_split %>%
+                    testing()
+```
+
+## A first model
+
+```{r}
+data_other_train <- data_other_train %>% 
+  mutate(isSTEM = as.factor(isSTEM))
+
+data_other_validation <- data_other_validation %>% 
+  mutate(isSTEM = as.factor(isSTEM))
+
+fitted_logistic_model<- logistic_reg() %>%
+        set_engine("glm") %>%
+        set_mode("classification") %>%
+        fit(isSTEM~., data = data_other_train)
+
+# Class prediction
+pred_class <- predict(fitted_logistic_model,
+                      new_data = data_other_validation,
+                      type = "class")
+
+prediction_results <- data_other_validation %>%
+  select(isSTEM) %>%
+  bind_cols(pred_class)
+```
+
+Percent accuracy and kappa:
+
+```{r}
+accuracy(prediction_results, truth = isSTEM,
+         estimate = .pred_class)
+
+kap(prediction_results, truth = isSTEM,
+         estimate = .pred_class)
+```
+
+Confusion matrix:
+
+```{r}
+conf_mat(prediction_results, truth = isSTEM,
+         estimate = .pred_class)
+```
+
+#### [Your Turn]{style="color: green;"} ⤵ {style="font-style: normal; font-variant-caps: normal; letter-spacing: normal; orphans: auto; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: auto; word-spacing: 0px; -webkit-tap-highlight-color: rgba(26, 26, 26, 0.3); -webkit-text-size-adjust: auto; -webkit-text-stroke-width: 0px; text-decoration: none; caret-color: rgb(0, 0, 0); color: rgb(0, 0, 0);"}
+
+-   What do you notice?
+
+You might notice that we need to find good features that could help the model to predict when students would choose STEM majors. Next, we would find a feature that would be correlated with (`isSTEM` = 1).
+
+Let's first make bar charts as in learning lab 1.
+
+```{r}
+temp <- read_csv(here("data", "dat_csv_combine_final_full.csv"))
+
+temp <- temp %>% 
+  mutate(isSTEM = as.character(isSTEM))
+
+ggplot(temp, aes(x = isSTEM, y=AveCarelessness)) +
+  stat_summary(fun.data = mean_sdl, geom = "bar")+
+  facet_wrap(~problemType)
+```
+
+#### [Your Turn]{style="color: green;"} ⤵ {style="font-style: normal; font-variant-caps: normal; letter-spacing: normal; orphans: auto; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: auto; word-spacing: 0px; -webkit-tap-highlight-color: rgba(26, 26, 26, 0.3); -webkit-text-size-adjust: auto; -webkit-text-stroke-width: 0px; text-decoration: none; caret-color: rgb(0, 0, 0); color: rgb(0, 0, 0);"}
+
+-   What do you notice?
+
+You might notice that for some problem types, the gap of carelessness between STEM and non-STEM is larger and for some problem types, the gap is smaller. Thus, adding this feature might improve the model.
+
+#### [Your Turn]{style="color: green;"} ⤵ {style="font-style: normal; font-variant-caps: normal; letter-spacing: normal; orphans: auto; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: auto; word-spacing: 0px; -webkit-tap-highlight-color: rgba(26, 26, 26, 0.3); -webkit-text-size-adjust: auto; -webkit-text-stroke-width: 0px; text-decoration: none; caret-color: rgb(0, 0, 0); color: rgb(0, 0, 0);"}
+
+Please add `problemType` to the model and see whether the model performance improves.
+
+Hint: when adding `problemType` in the model, you should change this categorical data in dummy variables using the following code:
+
+`dat_csv_combine <- dummy_cols(dat_csv_combine, select_columns = 'problemType')`
+
+## Reach
+
+You have learned how to find good features. For this learning lab, your reach is to add features to your baseline model that you built with your own data.
